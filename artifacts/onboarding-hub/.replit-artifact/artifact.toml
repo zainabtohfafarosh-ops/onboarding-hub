@@ -1,0 +1,27 @@
+kind = "web"
+previewPath = "/"
+title = "Global New Hire Onboarding Hub"
+version = "1.0.0"
+id = "artifacts/onboarding-hub"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 21083
+
+[services.development]
+run = "pnpm --filter @workspace/onboarding-hub run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/onboarding-hub", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/onboarding-hub/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "21083"
+BASE_PATH = "/"

@@ -1,0 +1,1450 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: Global New Hire Onboarding Hub API
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: hires
+    description: New hire management
+  - name: tasks
+    description: Per-hire task tracking
+  - name: task-templates
+    description: Reusable task templates
+  - name: comm-templates
+    description: Communication templates
+  - name: scheduled-comms
+    description: Scheduled communications
+  - name: sync
+    description: Google Sheets sync
+  - name: dashboard
+    description: Dashboard and analytics
+  - name: orientation-schedules
+    description: Orientation schedule templates and cohort-specific drafts
+
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  # --- Dashboard ---
+  /dashboard:
+    get:
+      operationId: getDashboard
+      tags: [dashboard]
+      summary: Aggregated stats for the hub dashboard
+      responses:
+        "200":
+          description: Dashboard stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardStats"
+
+  /orientations/upcoming:
+    get:
+      operationId: getUpcomingOrientations
+      tags: [dashboard]
+      summary: List upcoming orientation Tuesdays with hire counts
+      responses:
+        "200":
+          description: List of upcoming orientations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/OrientationSummary"
+
+  /orientations/{date}:
+    get:
+      operationId: getOrientationByDate
+      tags: [dashboard]
+      summary: Get orientation summary for a specific date
+      parameters:
+        - name: date
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Orientation detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrientationDetail"
+        "404":
+          description: Not found
+
+  # --- Hires ---
+  /hires:
+    get:
+      operationId: listHires
+      tags: [hires]
+      summary: List all new hires
+      parameters:
+        - name: orientationDate
+          in: query
+          schema:
+            type: string
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: orientationType
+          in: query
+          schema:
+            type: string
+            enum: [in-person, virtual]
+      responses:
+        "200":
+          description: List of hires
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Hire"
+    post:
+      operationId: createHire
+      tags: [hires]
+      summary: Create a new hire record
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HireInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Hire"
+
+  /hires/{id}:
+    get:
+      operationId: getHire
+      tags: [hires]
+      summary: Get a single hire
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Hire detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Hire"
+        "404":
+          description: Not found
+    patch:
+      operationId: updateHire
+      tags: [hires]
+      summary: Update a hire record
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HireUpdate"
+      responses:
+        "200":
+          description: Updated hire
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Hire"
+        "404":
+          description: Not found
+    delete:
+      operationId: deleteHire
+      tags: [hires]
+      summary: Delete a hire record
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Not found
+
+  # --- Tasks (per hire) ---
+  /hires/{hireId}/tasks:
+    get:
+      operationId: listHireTasks
+      tags: [tasks]
+      summary: List tasks for a specific hire
+      parameters:
+        - name: hireId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of tasks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/HireTask"
+    post:
+      operationId: createHireTask
+      tags: [tasks]
+      summary: Add a task to a hire
+      parameters:
+        - name: hireId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HireTaskInput"
+      responses:
+        "201":
+          description: Created task
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HireTask"
+
+  /tasks/{id}:
+    patch:
+      operationId: updateTask
+      tags: [tasks]
+      summary: Update a task (e.g. mark complete)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HireTaskUpdate"
+      responses:
+        "200":
+          description: Updated task
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HireTask"
+        "404":
+          description: Not found
+    delete:
+      operationId: deleteTask
+      tags: [tasks]
+      summary: Delete a task
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  # --- Task Templates ---
+  /task-templates:
+    get:
+      operationId: listTaskTemplates
+      tags: [task-templates]
+      summary: List reusable task templates
+      responses:
+        "200":
+          description: List of task templates
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TaskTemplate"
+    post:
+      operationId: createTaskTemplate
+      tags: [task-templates]
+      summary: Create a task template
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TaskTemplateInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaskTemplate"
+
+  /task-templates/{id}:
+    patch:
+      operationId: updateTaskTemplate
+      tags: [task-templates]
+      summary: Update a task template
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TaskTemplateUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaskTemplate"
+    delete:
+      operationId: deleteTaskTemplate
+      tags: [task-templates]
+      summary: Delete a task template
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  # --- Comm Templates ---
+  /comm-templates:
+    get:
+      operationId: listCommTemplates
+      tags: [comm-templates]
+      summary: List all communication templates
+      responses:
+        "200":
+          description: List of comm templates
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CommTemplate"
+    post:
+      operationId: createCommTemplate
+      tags: [comm-templates]
+      summary: Create a communication template
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CommTemplateInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommTemplate"
+
+  /comm-templates/{id}:
+    get:
+      operationId: getCommTemplate
+      tags: [comm-templates]
+      summary: Get a single communication template
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Comm template
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommTemplate"
+        "404":
+          description: Not found
+    patch:
+      operationId: updateCommTemplate
+      tags: [comm-templates]
+      summary: Update a communication template
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CommTemplateUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommTemplate"
+    delete:
+      operationId: deleteCommTemplate
+      tags: [comm-templates]
+      summary: Delete a communication template
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  # --- Scheduled Comms ---
+  /scheduled-comms:
+    get:
+      operationId: listScheduledComms
+      tags: [scheduled-comms]
+      summary: List all scheduled communications
+      parameters:
+        - name: hireId
+          in: query
+          schema:
+            type: integer
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [scheduled, sent, cancelled, edited]
+      responses:
+        "200":
+          description: List of scheduled comms
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ScheduledComm"
+    post:
+      operationId: createScheduledComm
+      tags: [scheduled-comms]
+      summary: Schedule a communication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ScheduledCommInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScheduledComm"
+
+  /scheduled-comms/{id}:
+    get:
+      operationId: getScheduledComm
+      tags: [scheduled-comms]
+      summary: Get a single scheduled communication
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Scheduled comm
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScheduledComm"
+        "404":
+          description: Not found
+    patch:
+      operationId: updateScheduledComm
+      tags: [scheduled-comms]
+      summary: Edit a scheduled communication before it sends
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ScheduledCommUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScheduledComm"
+    delete:
+      operationId: deleteScheduledComm
+      tags: [scheduled-comms]
+      summary: Cancel/delete a scheduled communication
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /scheduled-comms/{id}/send:
+    post:
+      operationId: markScheduledCommSent
+      tags: [scheduled-comms]
+      summary: Mark a scheduled communication as sent
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Marked sent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScheduledComm"
+
+  # --- Orientation Schedules ---
+  /orientation-schedule-templates:
+    get:
+      operationId: listOrientationScheduleTemplates
+      tags: [orientation-schedules]
+      summary: List reusable orientation schedule templates
+      responses:
+        "200":
+          description: Template list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/OrientationScheduleTemplate"
+    post:
+      operationId: createOrientationScheduleTemplate
+      tags: [orientation-schedules]
+      summary: Create an orientation schedule template
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OrientationScheduleTemplateInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrientationScheduleTemplate"
+
+  /orientation-schedule-templates/{id}:
+    patch:
+      operationId: updateOrientationScheduleTemplate
+      tags: [orientation-schedules]
+      summary: Update an orientation schedule template
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OrientationScheduleTemplateUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrientationScheduleTemplate"
+        "404":
+          description: Not found
+
+  /orientation-schedule-workspace:
+    get:
+      operationId: getUpcomingOrientationScheduleWorkspace
+      tags: [orientation-schedules]
+      summary: Get or generate the next cohort orientation schedule workspace
+      responses:
+        "200":
+          description: Upcoming cohort workspace
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrientationScheduleWorkspace"
+
+  /orientation-schedule-workspace/{orientationDate}:
+    patch:
+      operationId: updateOrientationScheduleDraft
+      tags: [orientation-schedules]
+      summary: Save cohort-specific orientation schedule edits
+      parameters:
+        - name: orientationDate
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OrientationScheduleDraftUpdate"
+      responses:
+        "200":
+          description: Saved draft
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrientationScheduleDraft"
+        "404":
+          description: Not found
+
+  /orientation-schedule-workspace/{orientationDate}/regenerate:
+    post:
+      operationId: regenerateOrientationScheduleDraft
+      tags: [orientation-schedules]
+      summary: Replace a cohort draft with a fresh snapshot of current templates and hires
+      parameters:
+        - name: orientationDate
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Regenerated workspace
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrientationScheduleWorkspace"
+        "404":
+          description: Not found
+
+  # --- Google Sheets Sync ---
+  /sync/google-sheets:
+    post:
+      operationId: syncGoogleSheets
+      tags: [sync]
+      summary: Trigger a sync from Google Sheets
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SyncRequest"
+      responses:
+        "200":
+          description: Sync result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SyncStatus"
+
+  /sync/status:
+    get:
+      operationId: getSyncStatus
+      tags: [sync]
+      summary: Get the last sync status
+      responses:
+        "200":
+          description: Last sync status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SyncStatus"
+
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+
+    # --- Hire ---
+    Hire:
+      type: object
+      required: [id, firstName, lastName, email, title, location, orientationType, orientationDate, hiringManager, recruiter, addressSharedWithIT, createdAt, updatedAt]
+      properties:
+        id:
+          type: integer
+        firstName:
+          type: string
+        lastName:
+          type: string
+        email:
+          type: string
+        title:
+          type: string
+        department:
+          type: ["string", "null"]
+        location:
+          type: string
+        orientationType:
+          type: string
+          enum: [in-person, virtual]
+        orientationDate:
+          type: string
+        hiringManager:
+          type: string
+        recruiter:
+          type: string
+        functionalManager:
+          type: ["string", "null"]
+        managerInPerson:
+          type: ["boolean", "null"]
+        inPersonBuddy:
+          type: ["string", "null"]
+        laptopTrackingNumber:
+          type: ["string", "null"]
+        shippingAddress:
+          type: ["string", "null"]
+        addressSharedWithIT:
+          type: boolean
+        status:
+          type: string
+          enum: [confirmed, pending, cancelled]
+        notes:
+          type: ["string", "null"]
+        jiraTicketUrl:
+          type: ["string", "null"]
+        laptopType:
+          type: ["string", "null"]
+        isVip:
+          type: boolean
+        vipScenario:
+          type: ["string", "null"]
+        readinessScore:
+          type: integer
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+
+    HireInput:
+      type: object
+      required: [firstName, lastName, email, title, location, orientationType, orientationDate, hiringManager, recruiter]
+      properties:
+        firstName:
+          type: string
+        lastName:
+          type: string
+        email:
+          type: string
+        title:
+          type: string
+        department:
+          type: string
+        location:
+          type: string
+        orientationType:
+          type: string
+          enum: [in-person, virtual]
+        orientationDate:
+          type: string
+        hiringManager:
+          type: string
+        recruiter:
+          type: string
+        functionalManager:
+          type: string
+        managerInPerson:
+          type: boolean
+        inPersonBuddy:
+          type: string
+        laptopTrackingNumber:
+          type: string
+        shippingAddress:
+          type: string
+        addressSharedWithIT:
+          type: boolean
+        status:
+          type: string
+          enum: [confirmed, pending, cancelled]
+        notes:
+          type: string
+        jiraTicketUrl:
+          type: string
+        laptopType:
+          type: string
+        isVip:
+          type: boolean
+        vipScenario:
+          type: string
+
+    HireUpdate:
+      type: object
+      properties:
+        firstName:
+          type: string
+        lastName:
+          type: string
+        email:
+          type: string
+        title:
+          type: string
+        department:
+          type: string
+        location:
+          type: string
+        orientationType:
+          type: string
+          enum: [in-person, virtual]
+        orientationDate:
+          type: string
+        hiringManager:
+          type: string
+        recruiter:
+          type: string
+        functionalManager:
+          type: string
+        managerInPerson:
+          type: boolean
+        inPersonBuddy:
+          type: string
+        laptopTrackingNumber:
+          type: string
+        shippingAddress:
+          type: string
+        addressSharedWithIT:
+          type: boolean
+        status:
+          type: string
+          enum: [confirmed, pending, cancelled]
+        notes:
+          type: string
+        jiraTicketUrl:
+          type: string
+        laptopType:
+          type: string
+        isVip:
+          type: boolean
+        vipScenario:
+          type: string
+
+    # --- Tasks ---
+    HireTask:
+      type: object
+      required: [id, hireId, scheduledCommId, title, completed, createdAt]
+      properties:
+        id:
+          type: integer
+        hireId:
+          type: integer
+        scheduledCommId:
+          type: ["integer", "null"]
+          description: Scheduled communication that owns this task, when the task was generated from Communications.
+        title:
+          type: string
+        description:
+          type: ["string", "null"]
+        completed:
+          type: boolean
+        dueDate:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+
+    HireTaskInput:
+      type: object
+      required: [title]
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        dueDate:
+          type: string
+        completed:
+          type: boolean
+
+    HireTaskUpdate:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        completed:
+          type: boolean
+        dueDate:
+          type: string
+
+    # --- Task Templates ---
+    TaskTemplate:
+      type: object
+      required: [id, title, applicableTo, createdAt]
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        description:
+          type: ["string", "null"]
+        applicableTo:
+          type: string
+          enum: [virtual, in-person, all]
+        createdAt:
+          type: string
+
+    TaskTemplateInput:
+      type: object
+      required: [title, applicableTo]
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        applicableTo:
+          type: string
+          enum: [virtual, in-person, all]
+
+    TaskTemplateUpdate:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        applicableTo:
+          type: string
+          enum: [virtual, in-person, all]
+
+    # --- Comm Templates ---
+    CommTemplate:
+      type: object
+      required: [id, name, recipientType, subject, body, sendDayOffset, timingDescription, applicableTo, createdAt, updatedAt]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        recipientType:
+          type: string
+          enum: [hire, hiring-manager]
+        subject:
+          type: string
+        body:
+          type: string
+        sendDayOffset:
+          type: integer
+          description: "Days relative to orientation date. Negative = before orientation. E.g. -7 = 1 week before."
+        timingDescription:
+          type: string
+          description: "Human-readable delivery timing, including event-based or time-of-day triggers."
+        applicableTo:
+          type: string
+          enum: [virtual, in-person, all]
+        audience:
+          type: string
+          enum: [standard, vip]
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+
+    CommTemplateInput:
+      type: object
+      required: [name, recipientType, subject, body, sendDayOffset]
+      properties:
+        name:
+          type: string
+        recipientType:
+          type: string
+          enum: [hire, hiring-manager]
+        subject:
+          type: string
+        body:
+          type: string
+        sendDayOffset:
+          type: integer
+        timingDescription:
+          type: string
+        applicableTo:
+          type: string
+          enum: [virtual, in-person, all]
+        audience:
+          type: string
+          enum: [standard, vip]
+
+    CommTemplateUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        recipientType:
+          type: string
+          enum: [hire, hiring-manager]
+        subject:
+          type: string
+        body:
+          type: string
+        sendDayOffset:
+          type: integer
+        timingDescription:
+          type: string
+        applicableTo:
+          type: string
+          enum: [virtual, in-person, all]
+        audience:
+          type: string
+          enum: [standard, vip]
+
+    # --- Scheduled Comms ---
+    ScheduledComm:
+      type: object
+      required: [id, hireId, recipientType, subject, body, scheduledAt, status, createdAt, updatedAt]
+      properties:
+        id:
+          type: integer
+        hireId:
+          type: integer
+        hireName:
+          type: ["string", "null"]
+        commTemplateId:
+          type: ["integer", "null"]
+        recipientType:
+          type: string
+          enum: [hire, hiring-manager]
+        subject:
+          type: string
+        body:
+          type: string
+        scheduledAt:
+          type: string
+        sentAt:
+          type: ["string", "null"]
+        status:
+          type: string
+          enum: [scheduled, sent, cancelled, edited]
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+
+    ScheduledCommInput:
+      type: object
+      required: [hireId, recipientType, subject, body, scheduledAt]
+      properties:
+        hireId:
+          type: integer
+        commTemplateId:
+          type: integer
+        recipientType:
+          type: string
+          enum: [hire, hiring-manager]
+        subject:
+          type: string
+        body:
+          type: string
+        scheduledAt:
+          type: string
+
+    ScheduledCommUpdate:
+      type: object
+      properties:
+        subject:
+          type: string
+        body:
+          type: string
+        scheduledAt:
+          type: string
+        status:
+          type: string
+          enum: [scheduled, cancelled, edited]
+
+    # --- Orientation Schedules ---
+    OrientationScheduleTemplate:
+      type: object
+      required: [id, key, name, description, category, locations, audience, timezone, duration, accent, content, isActive, createdAt, updatedAt]
+      properties:
+        id:
+          type: integer
+        key:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        category:
+          type: string
+          enum: [north-america, mumbai, coop-north-america, coop-winnipeg, special]
+        locations:
+          type: array
+          items:
+            type: string
+        audience:
+          type: string
+        timezone:
+          type: string
+        duration:
+          type: string
+        accent:
+          type: string
+          enum: [blue, orange, emerald, violet]
+        content:
+          type: string
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+
+    OrientationScheduleTemplateInput:
+      type: object
+      required: [key, name, description, category, locations, audience, timezone, duration, accent, content]
+      properties:
+        key:
+          type: string
+          minLength: 1
+        name:
+          type: string
+          minLength: 1
+        description:
+          type: string
+        category:
+          type: string
+          enum: [north-america, mumbai, coop-north-america, coop-winnipeg, special]
+        locations:
+          type: array
+          items:
+            type: string
+        audience:
+          type: string
+        timezone:
+          type: string
+        duration:
+          type: string
+        accent:
+          type: string
+          enum: [blue, orange, emerald, violet]
+        content:
+          type: string
+        isActive:
+          type: boolean
+
+    OrientationScheduleTemplateUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+        description:
+          type: string
+        category:
+          type: string
+          enum: [north-america, mumbai, coop-north-america, coop-winnipeg, special]
+        locations:
+          type: array
+          items:
+            type: string
+        audience:
+          type: string
+        timezone:
+          type: string
+        duration:
+          type: string
+        accent:
+          type: string
+          enum: [blue, orange, emerald, violet]
+        content:
+          type: string
+        isActive:
+          type: boolean
+
+    OrientationScheduleGroup:
+      type: object
+      required: [templateId, templateName, category, locations, hireNames]
+      properties:
+        templateId:
+          type: integer
+        templateName:
+          type: string
+        category:
+          type: string
+        locations:
+          type: array
+          items:
+            type: string
+        hireNames:
+          type: array
+          items:
+            type: string
+
+    OrientationScheduleDraft:
+      type: object
+      required: [id, orientationDate, title, content, status, sourceTemplateIds, cohortSignature, createdAt, updatedAt]
+      properties:
+        id:
+          type: integer
+        orientationDate:
+          type: string
+        title:
+          type: string
+        content:
+          type: string
+        status:
+          type: string
+          enum: [draft, ready]
+        sourceTemplateIds:
+          type: array
+          items:
+            type: integer
+        cohortSignature:
+          type: string
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+
+    OrientationScheduleDraftUpdate:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+        content:
+          type: string
+        status:
+          type: string
+          enum: [draft, ready]
+
+    OrientationScheduleWorkspace:
+      type: object
+      required: [totalHires, inPersonCount, virtualCount, locations, groups, missingTemplateLocations, needsRegeneration]
+      properties:
+        orientationDate:
+          type: ["string", "null"]
+        totalHires:
+          type: integer
+        inPersonCount:
+          type: integer
+        virtualCount:
+          type: integer
+        locations:
+          type: array
+          items:
+            type: string
+        groups:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrientationScheduleGroup"
+        draft:
+          oneOf:
+            - $ref: "#/components/schemas/OrientationScheduleDraft"
+            - type: "null"
+        missingTemplateLocations:
+          type: array
+          items:
+            type: string
+        needsRegeneration:
+          type: boolean
+
+    # --- Dashboard ---
+    DashboardStats:
+      type: object
+      required: [totalUpcomingHires, pendingTasks, pendingComms, totalHiresAllTime, orientationTypeCounts]
+      properties:
+        totalUpcomingHires:
+          type: integer
+        nextOrientationDate:
+          type: ["string", "null"]
+        nextOrientationCount:
+          type: integer
+        pendingTasks:
+          type: integer
+        overdueTasks:
+          type: integer
+        overdueActions:
+          type: integer
+        pendingComms:
+          type: integer
+        totalHiresAllTime:
+          type: integer
+        orientationTypeCounts:
+          type: object
+          properties:
+            inPerson:
+              type: integer
+            virtual:
+              type: integer
+          required: [inPerson, virtual]
+        readinessAlerts:
+          type: array
+          items:
+            type: object
+            required: [hireId, hireName, orientationDate, score, missing]
+            properties:
+              hireId:
+                type: integer
+              hireName:
+                type: string
+              orientationDate:
+                type: string
+              score:
+                type: integer
+              missing:
+                type: array
+                items:
+                  type: string
+        nextOrientationHires:
+          type: array
+          items:
+            type: object
+            required: [id, firstName, lastName, title, hiringManager, recruiter, orientationType, location]
+            properties:
+              id:
+                type: integer
+              firstName:
+                type: string
+              lastName:
+                type: string
+              title:
+                type: string
+              hiringManager:
+                type: string
+              recruiter:
+                type: string
+              orientationType:
+                type: string
+                enum: [in-person, virtual]
+              location:
+                type: string
+              jiraTicketUrl:
+                type: ["string", "null"]
+
+    OrientationSummary:
+      type: object
+      required: [date, totalHires, inPersonCount, virtualCount, locations]
+      properties:
+        date:
+          type: string
+        totalHires:
+          type: integer
+        inPersonCount:
+          type: integer
+        virtualCount:
+          type: integer
+        locations:
+          type: array
+          items:
+            type: string
+        pendingTasksCount:
+          type: integer
+        pendingCommsCount:
+          type: integer
+
+    OrientationDetail:
+      type: object
+      required: [date, totalHires, inPersonCount, virtualCount, hires]
+      properties:
+        date:
+          type: string
+        totalHires:
+          type: integer
+        inPersonCount:
+          type: integer
+        virtualCount:
+          type: integer
+        hires:
+          type: array
+          items:
+            $ref: "#/components/schemas/Hire"
+
+    # --- Sync ---
+    SyncRequest:
+      type: object
+      required: [spreadsheetId]
+      properties:
+        spreadsheetId:
+          type: string
+        sheetName:
+          type: string
+
+    SyncStatus:
+      type: object
+      required: [status]
+      properties:
+        lastSyncAt:
+          type: ["string", "null"]
+        hiresAdded:
+          type: integer
+        hiresUpdated:
+          type: integer
+        status:
+          type: string
+          enum: [success, error, never]
+        errorMessage:
+          type: ["string", "null"]
+        spreadsheetId:
+          type: ["string", "null"]
+        sheetName:
+          type: ["string", "null"]

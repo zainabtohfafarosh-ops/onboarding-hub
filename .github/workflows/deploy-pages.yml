@@ -1,0 +1,54 @@
+name: Deploy site to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run typecheck:libs
+      - name: Build onboarding-hub
+        working-directory: artifacts/onboarding-hub
+        env:
+          PORT: "5173"
+          BASE_PATH: /${{ github.event.repository.name }}/
+          # Set this repository variable once your backend is live.
+          VITE_API_URL: ${{ vars.VITE_API_URL }}
+        run: |
+          pnpm run build
+          # GitHub Pages has no SPA routing: serve the app for deep links.
+          cp dist/public/index.html dist/public/404.html
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: artifacts/onboarding-hub/dist/public
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
